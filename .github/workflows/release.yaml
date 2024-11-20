@@ -1,0 +1,49 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version'
+        default: 'latest'
+        required: false
+  schedule:
+    - cron: "0 2 * * *"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - id: runner
+        uses: pozetroninc/github-action-get-latest-release@master
+        with:
+          owner: indico
+          repo: indico
+          excludes: prerelease, draft
+
+      - name: Tag name
+        id: tag
+        run: |
+          SRC_TAG=${{ steps.runner.outputs.release }}
+          echo "Upstream release = indico/indico-containers: ${SRC_TAG}"
+          if [ "${{ github.event.inputs.version || 'latest' }}" = "latest" ]; then
+            export TAG="${{ steps.runner.outputs.release }}"
+          else
+            export TAG="${SRC_TAG#v}"
+          fi
+          echo "Generating tag: $TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: mukunku/tag-exists-action@v1.6.0
+        id: checkTag
+        with:
+          tag: ${{ steps.tag.outputs.tag }}
+
+      - name: Create Release
+        if: ${{ steps.checkTag.outputs.exists == 'false' }}
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+          automatic_release_tag: "${{ steps.tag.outputs.tag }}"
+          prerelease: false
+          title: "${{ steps.tag.outputs.tag }}"

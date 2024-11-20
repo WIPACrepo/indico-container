@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version'
+        default: 'latest'
+        required: false
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/WIPACRepo/indico-container
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{major}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}.{{minor}}.{{patch}}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        if: ${{ github.event_name != 'pull_request' }}
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag version
+        if: ${{ startsWith( github.ref_name , 'v') }}
+        id: tag
+        run: |
+          TAG="${{ github.ref_name }}"
+          TAG2=${TAG:1}
+          echo "tag=$TAG2"
+          echo "tag=$TAG2" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push (Tag)
+        if: ${{ startsWith( github.ref_name , 'v') }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.tag.outputs.tag }}
+
+      - name: Build and push
+        if: ${{ ! startsWith( github.ref_name , 'v') }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.event.inputs.version || 'latest' }}
