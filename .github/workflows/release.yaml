@@ -27,9 +27,9 @@ jobs:
           SRC_TAG=${{ steps.runner.outputs.release }}
           echo "Upstream release = indico/indico-containers: ${SRC_TAG}"
           if [ "${{ github.event.inputs.version || 'latest' }}" = "latest" ]; then
-            export TAG="${{ steps.runner.outputs.release }}"
-          else
             export TAG="${SRC_TAG#v}"
+          else
+            export TAG="${{ github.event.inputs.version }}"
           fi
           echo "Generating tag: $TAG"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
