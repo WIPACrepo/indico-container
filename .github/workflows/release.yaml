@@ -41,9 +41,22 @@ jobs:
 
       - name: Create Release
         if: ${{ steps.checkTag.outputs.exists == 'false' }}
-        uses: "marvinpinto/action-automatic-releases@latest"
+        uses: actions/github-script@v7
         with:
-          repo_token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
-          automatic_release_tag: "${{ steps.tag.outputs.tag }}"
-          prerelease: false
-          title: "${{ steps.tag.outputs.tag }}"
+          github-token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: "refs/tags/${{ steps.tag.outputs.tag }}",
+              sha: context.sha
+            }).catch(err => {
+              if (err.status !== 422) throw err;
+              github.rest.git.updateRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: "tags/${{ steps.tag.outputs.tag }}",
+                sha: context.sha
+              });
+            })
+
